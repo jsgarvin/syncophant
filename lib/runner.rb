@@ -16,7 +16,7 @@ module Syncophant
       
       def initialize_folders
         FREQUENCIES.each do |frequency|
-          Dir.mkdir(send("#{frequency}_path")) unless File.exists?(send("#{frequency}_path")) && File.directory?(send("#{frequency}_path"))
+          Dir.mkdir(send("root_#{frequency}_path")) unless File.exists?(send("root_#{frequency}_path")) && File.directory?(send("root_#{frequency}_path"))
         end
       end
       
@@ -25,7 +25,7 @@ module Syncophant
       end
       
       FREQUENCIES.each do |frequency|
-        define_method("#{frequency}_path") do
+        define_method("root_#{frequency}_path") do
           "#{target}/#{frequency}"
         end
       end
