@@ -1,5 +1,5 @@
 Syncophant is in pre-alpha and should not be considered usable for anything.
 
-Syncophany will eventually be an incremental rsync backup script written in ruby.
+Syncophant will eventually be an incremental rsync backup script written in ruby.
 
 Syncophant should not be confused with Sycophant, which is an entirely different creature.
