@@ -1,3 +1,3 @@
 #!/usr/bin/ruby
-require 'lib/runner'
+require File.expand_path('../lib/runner',  __FILE__)
 Syncophant::Runner.run

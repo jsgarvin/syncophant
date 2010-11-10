@@ -5,8 +5,8 @@ module Syncophant
     class << self
       FREQUENCIES = [:hourly,:daily,:weekly,:monthly,:annually]
       
-      def run(path_to_config = nil)
-        load_config(path_to_config)
+      def run(path_to_config = nil, job_name = nil)
+        load_config(path_to_config,job_name)
         initialize_folders
       end
       
@@ -14,8 +14,8 @@ module Syncophant
       private
       #######
       
-      def load_config(path_to_config = 'config/config.yml')
-        @settings = YAML.load_file(path_to_config)
+      def load_config(path_to_config = nil, job_name = nil)
+        @settings = YAML.load_file(path_to_config || 'config/config.yml')[job_name ||  'default']
       end
       
       def initialize_folders
@@ -25,7 +25,7 @@ module Syncophant
       end
       
       def target
-        @settings['job_one']['target']
+        @settings['target']
       end
       
       FREQUENCIES.each do |frequency|

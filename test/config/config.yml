@@ -1,3 +1,3 @@
-test_one:
+default:
   source: ./test/source
   target: ./test/target
