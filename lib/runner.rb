@@ -10,10 +10,6 @@ module Syncophant
         initialize_folders
       end
       
-      #######
-      private
-      #######
-      
       def load_config(path_to_config = nil, job_name = nil)
         @settings = YAML.load_file(path_to_config || 'config/config.yml')[job_name ||  'default']
       end
@@ -33,6 +29,8 @@ module Syncophant
           "#{target}/#{frequency}"
         end
       end
+      
+      
     end
   end
 end
