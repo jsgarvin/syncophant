@@ -1,3 +1,3 @@
 task :test do
-    ruby "test/unit/tc_runner.rb"
+   Dir["test/unit/tc_*"].each { |test_case| ruby test_case }
 end
