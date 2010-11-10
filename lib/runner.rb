@@ -1,10 +1,12 @@
+require 'yaml'
+
 module Syncophant
   class Runner
     class << self
       FREQUENCIES = [:hourly,:daily,:weekly,:monthly,:annually]
       
-      def run
-        load_config
+      def run(path_to_config = nil)
+        load_config(path_to_config)
         initialize_folders
       end
       
@@ -12,8 +14,8 @@ module Syncophant
       private
       #######
       
-      def load_config
-        @settings = YAML.load_file('config/config.yml')
+      def load_config(path_to_config = 'config/config.yml')
+        @settings = YAML.load_file(path_to_config)
       end
       
       def initialize_folders
