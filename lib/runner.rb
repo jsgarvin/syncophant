@@ -35,17 +35,37 @@ module Syncophant
           "#{target}/#{frequency}"
         end
         
-        define_method("current_#{frequency}_target") do
-          t = Time.now
-          send("root_#{frequency}_target") + "/" + sprintf("%04d-%02d-%02d.%02d", t.year, t.month, t.day, t.hour)
-        end
-        
         define_method("previous_#{frequency}_target") do
           @previous_target ||= {}
           @previous_target[frequency] = Dir[send("root_#{frequency}_target")+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
         end
       end
      
+      def current_hourly_target
+        t = Time.now
+        root_hourly_target + '/' + sprintf("%04d-%02d-%02d.%02d", t.year, t.month, t.day, t.hour)
+      end
+     
+      def current_daily_target
+        t = Time.now
+        root_daily_target + '/' + sprintf("%04d-%02d-%02d", t.year, t.month, t.day)
+      end
+      
+      def current_weekly_target
+        t = Time.now
+        root_weekly_target + '/' + t.strftime("%Y-%W")
+      end
+      
+      def current_monthly_target
+        t = Time.now
+        root_monthly_target + '/' + t.strftime("%Y-%B")
+      end
+      
+      def current_annually_target
+        t = Time.now
+        root_annually_target + '/' + t.strftime("%Y")
+      end
+      
       def run_backups
         system 'cp', '-rl', previous_hourly_target, current_hourly_target unless previous_hourly_target.nil? or File.exists?(current_hourly_target)
         system 'rsync', '-a', source, current_hourly_target          
