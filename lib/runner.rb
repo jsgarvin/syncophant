@@ -15,6 +15,10 @@ module Syncophant
       
       def load_config(path_to_config = nil, job_name = nil)
         @settings = YAML.load_file(path_to_config || 'config/config.yml')[job_name ||  'default']
+        if @settings['rsync_flags']
+          #split rsync_flags into an array and strip leading and trailing single quotes from --exclude arguments
+          @settings['rsync_flags'] = @settings['rsync_flags'].split(/ /).collect {|arg| arg.gsub(/^\'/,'').gsub(/\'$/,'') } 
+        end
       end
       
       def initialize_root_frequency_folders
@@ -22,6 +26,7 @@ module Syncophant
           Dir.mkdir(send("root_#{frequency}_target")) unless File.exists?(send("root_#{frequency}_target")) && File.directory?(send("root_#{frequency}_target"))
         end
       end
+      
       
       def source
         @settings['source']
@@ -69,7 +74,7 @@ module Syncophant
       
       def run_backups
         system 'cp', '-rl', previous_hourly_target, current_hourly_target unless previous_hourly_target.nil? or File.exists?(current_hourly_target)
-        system 'rsync', '-a', source, current_hourly_target          
+        system 'rsync', *(['-aq', '--delete'] + @settings['rsync_flags'] + [source, current_hourly_target])          
         system 'cp', '-rl', current_hourly_target, current_daily_target unless previous_daily_target == current_daily_target
         system 'cp', '-rl', current_hourly_target, current_weekly_target unless previous_weekly_target == current_weekly_target
         system 'cp', '-rl', current_hourly_target, current_monthly_target unless previous_monthly_target == current_monthly_target
