@@ -9,6 +9,7 @@ module Syncophant
         load_config(path_to_config,job_name)
         initialize_root_frequency_folders
         return if previous_hourly_target == current_hourly_target  #already ran within the last hour
+        purge_old_backups
         run_backups
       end
       
@@ -73,6 +74,21 @@ module Syncophant
         system 'cp', '-rl', current_hourly_target, current_weekly_target unless previous_weekly_target == current_weekly_target
         system 'cp', '-rl', current_hourly_target, current_monthly_target unless previous_monthly_target == current_monthly_target
         system 'cp', '-rl', current_hourly_target, current_annually_target unless previous_annually_target == current_annually_target
+      end
+      
+      def purge_old_backups
+        while Dir[send("root_hourly_target")+'/*'].size > 24
+          File.delete(Dir[send("root_hourly_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        end
+        while Dir[send("root_daily_target")+'/*'].size > 7
+          File.delete(Dir[send("root_daily_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        end
+        while Dir[send("root_weekly_target")+'/*'].size > 5
+          File.delete(Dir[send("root_weekly_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        end
+        while Dir[send("root_monthly_target")+'/*'].size > 12
+          File.delete(Dir[send("root_monthly_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        end
       end
     end
   end
