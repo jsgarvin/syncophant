@@ -53,13 +53,13 @@ module Syncophant
       end
       
       def current_target_name(frequency)
-        time = Time.now
+        @time ||= Time.now #lock in time so that all results stay consistent over long runs
         case frequency
-          when :hourly  then sprintf("%04d-%02d-%02d.%02d", time.year, time.month, time.day, time.hour)
-          when :daily   then sprintf("%04d-%02d-%02d", time.year, time.month, time.day)
-          when :weekly  then time.strftime("%Y-%W")
-          when :monthly then time.strftime("%Y-%B")
-          when :yearly  then time.strftime("%Y")
+          when :hourly  then @time.strftime('%Y-%m-%d.%H')
+          when :daily   then @time.strftime('%Y-%m-%d')
+          when :weekly  then sprintf("%04d-%02d-week-%02d", @time.year, @time.month, (@time.day/7))
+          when :monthly then @time.strftime("%Y-%m")
+          when :yearly  then @time.strftime("%Y")
         end
       end
       
