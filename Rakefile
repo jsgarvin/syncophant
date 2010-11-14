@@ -6,5 +6,5 @@ task :test do
 end
 
 task :sync do
-  Syncophant::Runner.run
+  Syncophant.run
 end 
