@@ -1,4 +1,4 @@
-require File.expand_path('../lib/runner',  __FILE__)
+require File.expand_path('../lib/syncophant',  __FILE__)
 
 
 task :test do
