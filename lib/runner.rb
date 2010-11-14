@@ -1,14 +1,14 @@
 require 'yaml'
+require 'fileutils'
 
 module Syncophant
   class Runner
     class << self
-      FREQUENCIES = [:hourly,:daily,:weekly,:monthly,:annually]
+      FREQUENCIES = [:hourly,:daily,:weekly,:monthly,:yearly]
       
       def run(path_to_config = nil, job_name = nil)
         load_config(path_to_config,job_name)
-        initialize_root_frequency_folders
-        return if previous_hourly_target == current_hourly_target  #already ran within the last hour
+        initialize
         purge_old_backups
         run_backups
       end
@@ -21,81 +21,88 @@ module Syncophant
         end
       end
       
-      def initialize_root_frequency_folders
+      #Must be done first over nfs so that ownerships are correct.  If created by rsync daemon on readynas, root will own
+      #the folders and you'll never be able to delete them. 
+      def initialize
         FREQUENCIES.each do |frequency|
-          Dir.mkdir(send("root_#{frequency}_target")) unless File.exists?(send("root_#{frequency}_target")) && File.directory?(send("root_#{frequency}_target"))
+          Dir.mkdir(root_nfs_target(frequency)) unless File.exists?(root_nfs_target(frequency)) && File.directory?(root_nfs_target(frequency))
+          previous_target_name(frequency)
         end
       end
-      
       
       def source
         @settings['source']
       end
       
-      def target
-        @settings['target']
+      def nfs_path
+        @settings['nfs_path']
       end
       
-      FREQUENCIES.each do |frequency|
-        define_method("root_#{frequency}_target") do
-          "#{target}/#{frequency}"
-        end
-        
-        define_method("previous_#{frequency}_target") do
-          @previous_target ||= {}
-          @previous_target[frequency] = Dir[send("root_#{frequency}_target")+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
-        end
+      def rsync_daemon_address
+        @settings['rsync_daemon_path']
       end
      
-      def current_hourly_target
-        t = Time.now
-        root_hourly_target + '/' + sprintf("%04d-%02d-%02d.%02d", t.year, t.month, t.day, t.hour)
-      end
-     
-      def current_daily_target
-        t = Time.now
-        root_daily_target + '/' + sprintf("%04d-%02d-%02d", t.year, t.month, t.day)
+      def previous_target_name(frequency)
+        @previous_target_name ||= {}
+        return @previous_target_name[frequency] if @previous_target_name[frequency]
+        full_path = Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
+        @previous_target_name[frequency] = full_path ? File.basename(full_path) : ''
       end
       
-      def current_weekly_target
-        t = Time.now
-        root_weekly_target + '/' + t.strftime("%Y-%W")
+      def current_target_name(frequency)
+        time = Time.now
+        case frequency
+          when :hourly  then sprintf("%04d-%02d-%02d.%02d", time.year, time.month, time.day, time.hour)
+          when :daily   then sprintf("%04d-%02d-%02d", time.year, time.month, time.day)
+          when :weekly  then time.strftime("%Y-%W")
+          when :monthly then time.strftime("%Y-%B")
+          when :yearly  then time.strftime("%Y")
+        end
       end
       
-      def current_monthly_target
-        t = Time.now
-        root_monthly_target + '/' + t.strftime("%Y-%B")
+      def root_nfs_target(frequency)
+        "#{nfs_path}/#{frequency}"
       end
       
-      def current_annually_target
-        t = Time.now
-        root_annually_target + '/' + t.strftime("%Y")
+      def root_daemon_target(frequency)
+        "#{rsync_daemon_address}/#{frequency}"
+      end
+      
+      def current_nfs_target(frequency)
+        root_nfs_target(frequency) + '/' + current_target_name(frequency)
+      end
+      
+      def current_daemon_target(frequency)
+        root_daemon_target(frequency) + '/' + current_target_name(frequency)
+      end
+      
+      def link_destination(frequency)
+        frequency == :hourly ? "../#{previous_target_name(:hourly)}" : "../../hourly/#{current_target_name(:hourly)}"
       end
       
       def run_backups
-        if previous_hourly_target.nil? or File.exists?(current_hourly_target)
-          system 'rsync', *(['-aq', '--delete'] + @settings['rsync_flags'] + [source, current_hourly_target])          
-        else
-          system 'rsync', *(['-aq', '--delete', "--link-dest=#{previous_hourly_target}"] + @settings['rsync_flags'] + [source, current_hourly_target])
+        FREQUENCIES.each do |frequency|
+          Dir.mkdir(current_nfs_target(frequency)) unless File.exists?(current_nfs_target(frequency))
+          if frequency == :hourly and previous_target_name(frequency) == ''
+            system 'rsync', *(['-aq', '--delete'] + @settings['rsync_flags'] + [source, current_daemon_target(frequency)])          
+          elsif previous_target_name(frequency) != current_target_name(frequency)
+            system 'rsync', *(['-aq', '--delete', "--link-dest=#{link_destination(frequency)}"] + @settings['rsync_flags'] + [source, current_daemon_target(frequency)])
+          end
         end
-        system 'cp', '-rl', current_hourly_target, current_daily_target unless previous_daily_target == current_daily_target
-        system 'cp', '-rl', current_hourly_target, current_weekly_target unless previous_weekly_target == current_weekly_target
-        system 'cp', '-rl', current_hourly_target, current_monthly_target unless previous_monthly_target == current_monthly_target
-        system 'cp', '-rl', current_hourly_target, current_annually_target unless previous_annually_target == current_annually_target
       end
       
       def purge_old_backups
-        while Dir[send("root_hourly_target")+'/*'].size > 24
-          File.delete(Dir[send("root_hourly_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        while Dir[root_nfs_target(:hourly)+'/*'].size > 24
+          FileUtils.rm_rf(Dir[root_nfs_target(:hourly)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
         end
-        while Dir[send("root_daily_target")+'/*'].size > 7
-          File.delete(Dir[send("root_daily_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        while Dir[root_nfs_target(:daily)+'/*'].size > 7
+          FileUtils.rm_rf(Dir[root_nfs_target(:daily)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
         end
-        while Dir[send("root_weekly_target")+'/*'].size > 5
-          File.delete(Dir[send("root_weekly_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        while Dir[root_nfs_target(:weekly)+'/*'].size > 5
+          FileUtils.rm_rf(Dir[root_nfs_target(:weekly)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
         end
-        while Dir[send("root_monthly_target")+'/*'].size > 12
-          File.delete(Dir[send("root_monthly_target")+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        while Dir[root_nfs_target(:monthly)+'/*'].size > 12
+          FileUtils.rm_rf(Dir[root_nfs_target(:monthly)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
         end
       end
     end
