@@ -1,4 +1,5 @@
 default:
   source: /home/username/Documents
-  target: /mnt/nfs_mounted_nas/incremental_backups
+  nfs_path: /mnt/nfs_mounted_folder/incremental_backups 
+  rsync_daemon_path: rsync://192.168.1.42/path/to/incremental_backups
   rsync_flags: -L --exclude 'lost+found' --exclude 'vmware' --delete-excluded
