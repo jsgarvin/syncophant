@@ -91,17 +91,11 @@ class Syncophant
     end
     
     def purge_old_backups
-      while Dir[root_nfs_target(:hourly)+'/*'].size > 24
-        FileUtils.rm_rf(Dir[root_nfs_target(:hourly)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
-      end
-      while Dir[root_nfs_target(:daily)+'/*'].size > 7
-        FileUtils.rm_rf(Dir[root_nfs_target(:daily)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
-      end
-      while Dir[root_nfs_target(:weekly)+'/*'].size > 5
-        FileUtils.rm_rf(Dir[root_nfs_target(:weekly)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
-      end
-      while Dir[root_nfs_target(:monthly)+'/*'].size > 12
-        FileUtils.rm_rf(Dir[root_nfs_target(:monthly)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+      purge_count = {:hourly => 24, :daily => 7, :weekly => 5, :monthly => 12}
+      purge_count.keys.each do |frequency|
+        while Dir[root_nfs_target(frequency)+'/*'].size > purge_count[frequency]
+          FileUtils.rm_rf(Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+        end
       end
     end
   end
