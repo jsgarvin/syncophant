@@ -7,4 +7,4 @@ end
 
 task :sync do
   Syncophant::Runner.run
-end 
+end
