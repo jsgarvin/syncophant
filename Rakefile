@@ -1,4 +1,4 @@
-require File.expand_path('../lib/syncophant',  __FILE__)
+require File.expand_path('../lib/runner',  __FILE__)
 
 
 task :test do
@@ -6,5 +6,5 @@ task :test do
 end
 
 task :sync do
-  Syncophant.run
+  Syncophant::Runner.run
 end 
