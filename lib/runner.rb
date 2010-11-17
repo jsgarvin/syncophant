@@ -17,11 +17,20 @@ module Syncophant
       end
       
       def load_config(path_to_config = nil, job_name = nil)
-        @settings = YAML.load_file(path_to_config || 'config/config.yml')[job_name ||  'default']
+        @path_to_config = path_to_config || 'config/config.yml'
+        @job_name = job_name  ||  'default'
+        @settings = YAML.load_file(@path_to_config)[@job_name]
         if @settings['rsync_flags']
           #split rsync_flags into an array and strip leading and trailing single quotes from --exclude arguments
           @settings['rsync_flags'] = @settings['rsync_flags'].split(/ /).map {|arg| arg.gsub(/^\'/,'').gsub(/\'$/,'') } 
         end
+      end
+      
+      def save_config
+        full_settings = YAML.load_file(@path_to_config)
+        full_settings[@job_name] = @settings
+        full_settings[@job_name]['rsync_flags'] = full_settings[@job_name]['rsync_flags'].join(' ')
+        File.open(@path_to_config, 'w') {|f| f.write(full_settings.to_yaml) }
       end
       
       #Must be done first over nfs so that ownerships are correct.  If created by rsync daemon on readynas, root will own
@@ -29,12 +38,19 @@ module Syncophant
       def initialize
         FREQUENCIES.each do |frequency|
           Dir.mkdir(root_nfs_target(frequency)) unless File.exists?(root_nfs_target(frequency)) && File.directory?(root_nfs_target(frequency))
-          previous_target_name(frequency)
+        end
+        if previous_target_name(:hourly) != last_successful_hourly_target and !last_successful_hourly_target.nil? and File.exists?(root_nfs_target(:hourly) + '/' + last_successful_hourly_target)
+          File.rename(previous_nfs_target(:hourly), current_nfs_target(:hourly))
+          @previous_target_name[:hourly] = last_successful_hourly_target
         end
       end
       
       def source
         @settings['source']
+      end
+      
+      def last_successful_hourly_target
+        @settings['last_successful_hourly_target']
       end
       
       def nfs_path
@@ -75,6 +91,10 @@ module Syncophant
         root_nfs_target(frequency) + '/' + current_target_name(frequency)
       end
       
+      def previous_nfs_target(frequency)
+        root_nfs_target(frequency) + '/' + previous_target_name(frequency)
+      end
+      
       def current_daemon_target(frequency)
         root_daemon_target(frequency) + '/' + current_target_name(frequency)
       end
@@ -91,6 +111,10 @@ module Syncophant
           elsif previous_target_name(frequency) != current_target_name(frequency)
             system 'rsync', *(['-aq', '--delete', "--link-dest=#{link_destination(frequency)}"] + @settings['rsync_flags'] + [source, current_daemon_target(frequency)])
           end
+        end
+        unless previous_target_name(:hourly) == current_target_name(:hourly)
+          @settings['last_successfull_hourly_target'] = current_target_name(:hourly)
+          save_config
         end
       end
       
