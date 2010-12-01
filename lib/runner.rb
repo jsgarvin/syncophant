@@ -39,6 +39,7 @@ module Syncophant
         FREQUENCIES.each do |frequency|
           Dir.mkdir(root_nfs_target(frequency)) unless File.exists?(root_nfs_target(frequency)) && File.directory?(root_nfs_target(frequency))
         end
+        initialize_previous_target_names
         if previous_target_name(:hourly) != last_successful_hourly_target and !last_successful_hourly_target.nil? and File.exists?(root_nfs_target(:hourly) + '/' + last_successful_hourly_target)
           File.rename(previous_nfs_target(:hourly), current_nfs_target(:hourly))
           @previous_target_name[:hourly] = last_successful_hourly_target
@@ -61,11 +62,16 @@ module Syncophant
         @settings['rsync_daemon_path']
       end
      
+      def initialize_previous_target_names
+        @previous_target_name = {}
+        FREQUENCIES.each do |frequency|
+          full_path = Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
+          @previous_target_name[frequency] = full_path ? File.basename(full_path) : ''
+        end
+      end
+      
       def previous_target_name(frequency)
-        @previous_target_name ||= {}
-        return @previous_target_name[frequency] if @previous_target_name[frequency]
-        full_path = Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
-        @previous_target_name[frequency] = full_path ? File.basename(full_path) : ''
+        @previous_target_name[frequency]
       end
       
       def current_target_name(frequency)
