@@ -128,7 +128,9 @@ module Syncophant
         purge_count = {:hourly => 24, :daily => 7, :weekly => 5, :monthly => 12}
         purge_count.keys.each do |frequency|
           while Dir[root_nfs_target(frequency)+'/*'].size > purge_count[frequency]
-            FileUtils.rm_rf(Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+            system 'mkdir', 'empty_source'
+            basename = File.basename(Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
+            system 'rsync', '-ar', '--del', 'empty_source', (root_daemon_target(frequency) + '/' + basename)
           end
         end
       end
