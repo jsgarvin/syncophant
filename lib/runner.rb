@@ -12,7 +12,6 @@ module Syncophant
         Syncophant::LockFile.new do
           initialize
           purge_old_backups
-die
           run_backups
         end
       end
