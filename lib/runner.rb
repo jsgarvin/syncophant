@@ -12,6 +12,7 @@ module Syncophant
         Syncophant::LockFile.new do
           initialize
           purge_old_backups
+die
           run_backups
         end
       end
@@ -125,14 +126,18 @@ module Syncophant
       end
       
       def purge_old_backups
+        system 'rm', '-fr', 'empty_source'
+        system 'mkdir', 'empty_source'
         purge_count = {:hourly => 24, :daily => 7, :weekly => 5, :monthly => 12}
         purge_count.keys.each do |frequency|
           while Dir[root_nfs_target(frequency)+'/*'].size > purge_count[frequency]
-            system 'mkdir', 'empty_source'
-            basename = File.basename(Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first)
-            system 'rsync', '-ar', '--del', 'empty_source', (root_daemon_target(frequency) + '/' + basename)
+            full_nfs_path = Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first
+            basename = File.basename(full_nfs_path)
+            system 'rsync', '-ar', '--del', 'empty_source/', (root_daemon_target(frequency) + '/' + basename) +'/'
+             FileUtils.rm_rf(full_nfs_path)
           end
         end
+        system 'rm', '-fr', 'empty_source'
       end
     end
   end
