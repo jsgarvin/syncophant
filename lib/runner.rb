@@ -33,15 +33,13 @@ module Syncophant
         File.open(@path_to_config, 'w') {|f| f.write(full_settings.to_yaml) }
       end
       
-      #Must be done first over nfs so that ownerships are correct.  If created by rsync daemon on readynas, root will own
-      #the folders and you'll never be able to delete them. 
       def initialize
         FREQUENCIES.each do |frequency|
-          Dir.mkdir(root_nfs_target(frequency)) unless File.exists?(root_nfs_target(frequency)) && File.directory?(root_nfs_target(frequency))
+          Dir.mkdir(root_target(frequency)) unless File.exists?(root_target(frequency)) && File.directory?(root_target(frequency))
         end
         initialize_previous_target_names
-        if previous_target_name(:hourly) != last_successful_hourly_target and !last_successful_hourly_target.nil? and File.exists?(root_nfs_target(:hourly) + '/' + last_successful_hourly_target)
-          File.rename(previous_nfs_target(:hourly), current_nfs_target(:hourly))
+        if previous_target_name(:hourly) != last_successful_hourly_target and !last_successful_hourly_target.nil? and File.exists?(root_target(:hourly) + '/' + last_successful_hourly_target)
+          File.rename(previous_target(:hourly), current_target(:hourly))
           @previous_target_name[:hourly] = last_successful_hourly_target
         end
       end
@@ -54,18 +52,14 @@ module Syncophant
         @settings['last_successful_hourly_target']
       end
       
-      def nfs_path
-        @settings['nfs_path']
-      end
-      
-      def rsync_daemon_address
-        @settings['rsync_daemon_path']
+      def destination
+        @settings['destination']
       end
      
       def initialize_previous_target_names
         @previous_target_name = {}
         FREQUENCIES.each do |frequency|
-          full_path = Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
+          full_path = Dir[root_target(frequency)+'/*'].sort{|a,b| File.ctime(b) <=> File.ctime(a) }.first
           @previous_target_name[frequency] = full_path ? File.basename(full_path) : ''
         end
       end
@@ -85,24 +79,16 @@ module Syncophant
         end
       end
       
-      def root_nfs_target(frequency)
-        "#{nfs_path}/#{frequency}"
+      def root_target(frequency)
+        "#{destination}/#{frequency}"
       end
       
-      def root_daemon_target(frequency)
-        "#{rsync_daemon_address}/#{frequency}"
+      def current_target(frequency)
+        root_target(frequency) + '/' + current_target_name(frequency)
       end
       
-      def current_nfs_target(frequency)
-        root_nfs_target(frequency) + '/' + current_target_name(frequency)
-      end
-      
-      def previous_nfs_target(frequency)
-        root_nfs_target(frequency) + '/' + previous_target_name(frequency)
-      end
-      
-      def current_daemon_target(frequency)
-        root_daemon_target(frequency) + '/' + current_target_name(frequency)
+      def previous_target(frequency)
+        root_target(frequency) + '/' + previous_target_name(frequency)
       end
       
       def link_destination(frequency)
@@ -111,11 +97,11 @@ module Syncophant
       
       def run_backups
         FREQUENCIES.each do |frequency|
-          Dir.mkdir(current_nfs_target(frequency)) unless File.exists?(current_nfs_target(frequency))
+          Dir.mkdir(current_target(frequency)) unless File.exists?(current_target(frequency))
           if frequency == :hourly and previous_target_name(frequency) == ''
-            system 'rsync', *(['-aq', '--delete'] + @settings['rsync_flags'] + [source, current_daemon_target(frequency)])          
+            system 'rsync', *(['-aq', '--delete'] + @settings['rsync_flags'] + [source, current_target(frequency)])          
           elsif previous_target_name(frequency) != current_target_name(frequency)
-            system 'rsync', *(['-aq', '--delete', "--link-dest=#{link_destination(frequency)}"] + @settings['rsync_flags'] + [source, current_daemon_target(frequency)])
+            system 'rsync', *(['-aq', '--delete', "--link-dest=#{link_destination(frequency)}"] + @settings['rsync_flags'] + [source, current_target(frequency)])
           end
         end
         unless previous_target_name(:hourly) == current_target_name(:hourly)
@@ -125,18 +111,14 @@ module Syncophant
       end
       
       def purge_old_backups
-        system 'rm', '-fr', 'empty_source'
-        system 'mkdir', 'empty_source'
         purge_count = {:hourly => 24, :daily => 7, :weekly => 5, :monthly => 12}
         purge_count.keys.each do |frequency|
-          while Dir[root_nfs_target(frequency)+'/*'].size > purge_count[frequency]
-            full_nfs_path = Dir[root_nfs_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first
-            basename = File.basename(full_nfs_path)
-            system 'rsync', '-ar', '--del', 'empty_source/', (root_daemon_target(frequency) + '/' + basename) +'/'
-             FileUtils.rm_rf(full_nfs_path)
+          while Dir[root_target(frequency)+'/*'].size > purge_count[frequency]
+            full_path = Dir[root_target(frequency)+'/*'].sort{|a,b| File.ctime(a) <=> File.ctime(b) }.first
+            basename = File.basename(full_path)
+            FileUtils.rm_rf(full_path)
           end
         end
-        system 'rm', '-fr', 'empty_source'
       end
     end
   end
