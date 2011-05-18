@@ -10,9 +10,11 @@ module Syncophant
       def run(path_to_config = nil, job_name = nil)
         load_config(path_to_config,job_name)
         Syncophant::LockFile.new do
-          initialize
-          purge_old_backups
-          run_backups
+          if File.exists?(File.expand_path(@settings['source'])) and File.directory?(@settings['source']) and File.exists?(File.expand_path(@settings['destination'])) and File.directory?(@settings['destination'])
+            initialize
+            purge_old_backups
+            run_backups
+          end
         end
       end
       
